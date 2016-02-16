@@ -8,7 +8,11 @@
   <import resource="camel-cxf.xml" />
 
   <!-- incoming requests from the servlet is routed --><!-- is there a header with the key name? --><!-- yes so return back a message to the user --><!-- if no name parameter then output a syntax to the user -->
-  <!-- route starts from the cxf webservice, see camel-cxf.xml for details --><!-- and then create the OK reply for the webservice which is still waiting for a reply --><camelContext xmlns="http://camel.apache.org/schema/spring">
+  <!-- route starts from the cxf webservice, see camel-cxf.xml for details --><!-- and then create the OK reply for the webservice which is still waiting for a reply --><!--   <route id="pushNewCustomerToTopic">
+    <from uri="seda:incomingCustomers"/>
+    <convertBodyTo type="java.lang.String"/>
+    <to uri="activemq:topic:newCustomer"/>
+  </route> --><camelContext xmlns="http://camel.apache.org/schema/spring">
   <route id="helloRoute">
     <from uri="servlet:hello"/>
     <choice>
@@ -28,11 +32,21 @@
   </route>
   <route id="newCustomer">
     <from uri="cxf:bean:customerEndpoint"/>
-    <to uri="seda:incomingCustomers"/>
-    <transform>
-      <constant>OK</constant>
-    </transform>
+    <convertBodyTo type="java.lang.String"/>
+    <to uri="activemq:queue:newCustomer"/>
+  </route>
+  <route id="newCustomerOut">
+    <from uri="activemq:queue:newCustomer"/>
+    <convertBodyTo type="java.lang.String"/>
+    <to uri="file://C://inboxCamel"/>
   </route>
 </camelContext>
+
+<bean id="activemq" 
+      class="org.apache.activemq.camel.component.ActiveMQComponent">
+      <property name="brokerURL" value="tcp://localhost:61616"/>
+      <property name="userName" value="admin"/>
+      <property name="password" value="admin"/>
+</bean>
 
 </beans>

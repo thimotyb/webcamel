@@ -12,7 +12,11 @@
     <from uri="seda:incomingCustomers"/>
     <convertBodyTo type="java.lang.String"/>
     <to uri="activemq:topic:newCustomer"/>
-  </route> --><camelContext xmlns="http://camel.apache.org/schema/spring">
+  </route> -->
+ 
+ <bean id="sampleProcessor" class="it.sisal.webcamel.CustomerProcessor"/>
+  
+ <camelContext xmlns="http://camel.apache.org/schema/spring">
   <route id="helloRoute">
     <from uri="servlet:hello"/>
     <choice>
@@ -30,17 +34,30 @@
     </choice>
     <to uri="mock:endHello"/>
   </route>
+  
   <route id="newCustomer">
-    <from uri="cxf:bean:customerEndpoint"/>
-    <convertBodyTo type="java.lang.String"/>
-    <to uri="activemq:queue:newCustomer"/>
+    <from uri="cxf:bean:customerEndpoint?dataFormat=PAYLOAD"/>
+    <inOnly uri="bean:sampleProcessor?method=processData"/>
+    <log message="${body}"></log>
+<!--     <to uri="activemq:queue:newCustomer"/> -->
+    <wireTap uri="activemq:topic:topic.newCustomer"/>
+    <transform>
+         <constant><![CDATA[
+			<ns2:updateCustomerResponse xmlns:ns2="http://demo.fusesource.com/wsdl/CustomerService/"/>
+        ]]></constant>
+    </transform>
   </route>
-  <route id="newCustomerOut">
+  
+<!--   <route id="newCustomerOut">
     <from uri="activemq:queue:newCustomer"/>
     <convertBodyTo type="java.lang.String"/>
     <to uri="file://C://inboxCamel"/>
-  </route>
+  </route> -->
+  
+  
 </camelContext>
+
+
 
 <bean id="activemq" 
       class="org.apache.activemq.camel.component.ActiveMQComponent">

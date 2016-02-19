@@ -7,6 +7,8 @@
 
   <import resource="camel-cxf.xml" />
 
+  <import resource="datasource.xml" />
+
   <!-- incoming requests from the servlet is routed --><!-- is there a header with the key name? --><!-- yes so return back a message to the user --><!-- if no name parameter then output a syntax to the user -->
   <!-- route starts from the cxf webservice, see camel-cxf.xml for details --><!-- and then create the OK reply for the webservice which is still waiting for a reply --><!--   <route id="pushNewCustomerToTopic">
     <from uri="seda:incomingCustomers"/>
@@ -16,7 +18,8 @@
  
  <bean id="sampleProcessor" class="it.sisal.webcamel.CustomerProcessor"/>
   
- <camelContext xmlns="http://camel.apache.org/schema/spring">
+ <!-- use Camel property placeholder loaded from the given file --><!--     <to uri="activemq:queue:newCustomer"/> --><!-- Route l'evento su una coda per controllo --><!-- Trasforma in file piatto e posiziona su file --><!-- inserisce nel db nuovi clienti --><!--  <from uri="timer:foo?period=5s"/> --><camelContext xmlns="http://camel.apache.org/schema/spring">
+  <propertyPlaceholder location="classpath:sql.properties" id="placeholder"/>
   <route id="helloRoute">
     <from uri="servlet:hello"/>
     <choice>
@@ -34,27 +37,37 @@
     </choice>
     <to uri="mock:endHello"/>
   </route>
-  
   <route id="newCustomer">
     <from uri="cxf:bean:customerEndpoint?dataFormat=PAYLOAD"/>
     <inOnly uri="bean:sampleProcessor?method=processData"/>
-    <log message="${body}"></log>
-<!--     <to uri="activemq:queue:newCustomer"/> -->
+    <log message="${body}"/>
     <wireTap uri="activemq:topic:topic.newCustomer"/>
     <transform>
-         <constant><![CDATA[
-			<ns2:updateCustomerResponse xmlns:ns2="http://demo.fusesource.com/wsdl/CustomerService/"/>
-        ]]></constant>
+      <constant>
+			&lt;ns2:updateCustomerResponse xmlns:ns2="http://demo.fusesource.com/wsdl/CustomerService/"/&gt;
+        </constant>
     </transform>
   </route>
-  
-<!--   <route id="newCustomerOut">
-    <from uri="activemq:queue:newCustomer"/>
-    <convertBodyTo type="java.lang.String"/>
+  <route id="eventToQueue">
+    <from uri="activemq:topic:topic.newCustomer"/>
+    <to uri="activemq:queue:newCustomer"/>
+  </route>
+  <route id="eventToFile">
+    <from uri="activemq:topic:topic.newCustomer"/>
+    <to uri="xslt:customer.xslt"/>
     <to uri="file://C://inboxCamel"/>
-  </route> -->
-  
-  
+  </route>
+  <route id="eventToDb">
+    <from uri="activemq:topic:topic.newCustomer"/>
+    <transform>
+      <simple>${in.body}</simple>
+    </transform>
+    <transform>
+      <method ref="sampleProcessor" method="insertCustomer"></method>
+    </transform>
+    <to uri="sql:{{sql.insertCustomer}}"/>
+    <log message="Inserito nuovo cliente ${body[id]}"/>
+  </route>
 </camelContext>
 
 
